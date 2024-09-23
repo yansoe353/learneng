@@ -12,7 +12,9 @@ This was bootstrapped with [`create-next-app`](https://github.com/vercel/next.js
 1. Vercel set env vars
 
 ## Query Params
-1. **Debug Loggin**: `showDebugMessages=true` to turn on some additional console logging.
-1. **Speaker Mute Toggle**: `showSpeakerMute=true`
-1. **Change Model**: `model=ultravox-70B`. Note: the app will prepend `fixie-ai/` in front of the model name passed in.
-1. **Enable User Transcripts**: `showUserTranscripts=true` will display user transcripts. Otherwise, only Ultravox/agent transcripts are shown.
+| What | Parameter | Notes |
+|--------|--------|---------|
+|**Debug Logging**|`showDebugMessages=true`| Turns on some additional console logging.|
+|**Speaker Mute Toggle**|`showSpeakerMute=true`| Shows the speaker mute button.|
+|**Change Model**|`model=ultravox-70B`|Changes the model to what is specified. Note: the app will prepend `fixie-ai/` to the value.|
+|**Enable User Transcripts**|`showUserTranscripts=true`|Displays user transcripts. Otherwise, only Ultravox/agent transcripts are shown.|
