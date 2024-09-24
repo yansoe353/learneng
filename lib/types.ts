@@ -1,5 +1,5 @@
 export interface JoinUrlResponse {
-  uuid: string;
+  callId: string;
   created: Date;
   ended: Date | null;
   model: string;
@@ -60,7 +60,7 @@ interface DynamicParameter {
   name: string;
   location: ParameterLocation;
   schema: object;
-  required: boolean;
+  required?: boolean;
 }
 
 interface StaticParameter {
