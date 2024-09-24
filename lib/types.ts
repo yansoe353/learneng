@@ -16,7 +16,7 @@ export enum RoleEnum {
   TOOL_RESULT = "TOOL_RESULT"
 }
 
-enum ParameterLocation {
+export enum ParameterLocation {
   UNSPECIFIED = "PARAMETER_LOCATION_UNSPECIFIED",
   QUERY = "PARAMETER_LOCATION_QUERY",
   PATH = "PARAMETER_LOCATION_PATH",
@@ -24,7 +24,7 @@ enum ParameterLocation {
   BODY = "PARAMETER_LOCATION_BODY"
 }
 
-enum KnownParamEnum {
+export enum KnownParamEnum {
   UNSPECIFIED = "KNOWN_PARAM_UNSPECIFIED",
   CALL_ID = "KNOWN_PARAM_CALL_ID"
 }
