@@ -48,11 +48,11 @@ export interface SelectedTool {
 
 export interface BaseToolDefinition {
   description: string;
-  dynamicParameters: DynamicParameter[];
-  staticParameters: StaticParameter[];
-  automaticParameters: AutomaticParameter[];
-  requirements: ToolRequirements;
-  http: BaseHttpToolDetails;
+  dynamicParameters?: DynamicParameter[];
+  staticParameters?: StaticParameter[];
+  automaticParameters?: AutomaticParameter[];
+  requirements?: ToolRequirements;
+  http?: BaseHttpToolDetails;
 }
 
 interface DynamicParameter {
