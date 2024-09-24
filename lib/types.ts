@@ -26,7 +26,8 @@ export enum ParameterLocation {
 
 export enum KnownParamEnum {
   UNSPECIFIED = "KNOWN_PARAM_UNSPECIFIED",
-  CALL_ID = "KNOWN_PARAM_CALL_ID"
+  CALL_ID = "KNOWN_PARAM_CALL_ID",
+  CONVERSATION_HISTORY = "KNOWN_PARAM_CONVERSATION_HISTORY"
 }
 
 export interface Message {
