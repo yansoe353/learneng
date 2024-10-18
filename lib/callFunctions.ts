@@ -1,30 +1,29 @@
 'use client';
-import { UltravoxSession, UltravoxSessionStatus, Transcript, UltravoxSessionStateChangeEvent, UltravoxSessionState, UltravoxExperimentalMessageEvent, Role } from 'ultravox-client';
+import { UltravoxSession, UltravoxSessionStatus, Transcript, UltravoxExperimentalMessageEvent, Role } from 'ultravox-client';
 import { JoinUrlResponse, CallConfig } from '@/lib/types';
 
-let UVState: UltravoxSessionState | null;
-let UVSession: UltravoxSession | null = null;
+let uvSession: UltravoxSession | null = null;
 const debugMessages: Set<string> = new Set(["debug"]);
 
 interface CallCallbacks {
-  onStatusChange: (status: UltravoxSessionStatus) => void;
-  onTranscriptChange: (transcripts: Transcript[]) => void;
+  onStatusChange: (status: UltravoxSessionStatus | undefined) => void;
+  onTranscriptChange: (transcripts: Transcript[] | undefined) => void;
   onDebugMessage?: (message: UltravoxExperimentalMessageEvent ) => void;
 }
 
 export function toggleMute(role: Role): void {
 
-  if (UVSession) {
+  if (uvSession) {
     // Toggle (user) Mic
     if (role == Role.USER) {
-      UVSession.isMicMuted ? UVSession.unmuteMic() : UVSession.muteMic();
+      uvSession.isMicMuted ? uvSession.unmuteMic() : uvSession.muteMic();
     } 
     // Mute (agent) Speaker
     else {
-      UVSession.isSpeakerMuted ? UVSession.unmuteSpeaker() : UVSession.muteSpeaker();
+      uvSession.isSpeakerMuted ? uvSession.unmuteSpeaker() : uvSession.muteSpeaker();
     }
   } else {
-    console.error('UVSession is not initialized.');
+    console.error('uvSession is not initialized.');
   }
 }
 
@@ -64,39 +63,40 @@ export async function startCall(callbacks: CallCallbacks, callConfig: CallConfig
   const callData = await createCall(callConfig, showDebugMessages);
   const joinUrl = callData.joinUrl;
 
-  if (!joinUrl && !UVSession) {
+  if (!joinUrl && !uvSession) {
     console.error('Join URL is required');
     return;
   } else {
     console.log('Joining call:', joinUrl);
 
     // Start up our Ultravox Session
-    UVSession = new UltravoxSession({ experimentalMessages: debugMessages });
+    uvSession = new UltravoxSession({ experimentalMessages: debugMessages });
 
     if(showDebugMessages) {
-      console.log('UVSession created:', UVSession);
-      console.log('UVSession methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(UVSession)));
+      console.log('uvSession created:', uvSession);
+      console.log('uvSession methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(uvSession)));
     }
 
-    if (UVSession) {
-      UVState = UVSession.joinCall(joinUrl);
-      console.log('Session status:', UVState.getStatus());
+    if (uvSession) {
+      uvSession.addEventListener('status', (event: any) => {
+        callbacks.onStatusChange(uvSession?.status);
+      });
+  
+      uvSession.addEventListener('transcript', (event: any) => {
+        callbacks.onTranscriptChange(uvSession?.transcripts);
+      });
+  
+      uvSession.addEventListener('experimental_message', (msg: any) => {
+        callbacks?.onDebugMessage?.(msg);
+      });
+
+      uvSession.joinCall(joinUrl);
+      console.log('Session status:', uvSession.status);
     } else {
       return;
     }
 
-    UVState.addEventListener('ultravoxSessionStatusChanged', (event: any) => {
-      callbacks.onStatusChange(event.state);
-    });
-
-    UVState.addEventListener('ultravoxTranscriptsChanged', (event: any) => {
-      let te: UltravoxSessionStateChangeEvent = event;
-      callbacks.onTranscriptChange(te.transcripts);
-    });
-
-    UVState.addEventListener('ultravoxExperimentalMessage', (msg: any) => {
-      callbacks?.onDebugMessage?.(msg);
-    });
+    
   }
 
   console.log('Call started!'); 
@@ -105,9 +105,8 @@ export async function startCall(callbacks: CallCallbacks, callConfig: CallConfig
 export async function endCall(): Promise<void> {
   console.log('Call ended.');
 
-  if (UVSession) {
-    UVSession.leaveCall();
-    UVState = null;
-    UVSession = null;
+  if (uvSession) {
+    uvSession.leaveCall();
+    uvSession = null;
   }  
 }

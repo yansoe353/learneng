@@ -7,7 +7,7 @@ This was bootstrapped with [`create-next-app`](https://github.com/vercel/next.js
 1. Add API key to .env.local
 1. Configure settings in demo-config.ts
 
-## Deployment TODO
+## Deployment
 1. Clone
 1. Vercel set env vars
 
