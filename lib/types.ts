@@ -48,12 +48,14 @@ export interface SelectedTool {
 }
 
 export interface BaseToolDefinition {
+  modelToolName?: string;
   description: string;
   dynamicParameters?: DynamicParameter[];
   staticParameters?: StaticParameter[];
   automaticParameters?: AutomaticParameter[];
   requirements?: ToolRequirements;
   http?: BaseHttpToolDetails;
+  client?: {};
 }
 
 interface DynamicParameter {
@@ -128,4 +130,16 @@ export interface DemoConfig {
   title: string;
   overview: string;
   callConfig: CallConfig;
+}
+
+// For our order details component
+export interface OrderItem {
+  name: string;
+  quantity: number;
+  specialInstructions?: string;
+  price: number;
+}
+export interface OrderDetailsData {
+  items: OrderItem[];
+  totalAmount: number;
 }

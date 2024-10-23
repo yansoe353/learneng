@@ -5,13 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import { startCall, endCall } from '@/lib/callFunctions'
 import { CallConfig, SelectedTool } from '@/lib/types'
 import demoConfig from './demo-config';
-import { Role, Transcript, UltravoxExperimentalMessageEvent } from 'ultravox-client';
+import { Role, Transcript, UltravoxExperimentalMessageEvent, UltravoxSessionStatus } from 'ultravox-client';
 import BorderedImage from '@/app/components/BorderedImage';
 import UVLogo from '@/public/UVMark-White.svg';
 import CallStatus from './components/CallStatus';
 import DebugMessages from '@/app/components/DebugMessages';
 import MicToggleButton from './components/MicToggleButton';
 import { PhoneOffIcon } from 'lucide-react';
+import OrderDetails from './components/OrderDetails';
 
 type SearchParamsProps = {
   showMuteSpeakerButton: boolean;
@@ -53,14 +54,19 @@ export default function Home() {
     }
   }, [callTranscript]);
 
-  const handleStatusChange = useCallback((status: string) => {
-    setAgentStatus(status);
+  const handleStatusChange = useCallback((status: UltravoxSessionStatus | string | undefined) => {
+    if(status) {
+      setAgentStatus(status);
+    } else {
+      setAgentStatus('off');
+    }
+    
   }, []);
 
-  const handleTranscriptChange = useCallback((transcripts: Transcript[]) => {
-    setCallTranscript(prevTranscripts => {  
-      return [...transcripts];
-    });
+  const handleTranscriptChange = useCallback((transcripts: Transcript[] | undefined) => {
+    if(transcripts) {
+      setCallTranscript([...transcripts]);
+    }
   }, []);
 
   const handleDebugMessage = useCallback((debugMessage: UltravoxExperimentalMessageEvent) => {
@@ -209,7 +215,9 @@ export default function Home() {
                   </div>
                 </div>
                 {/* Call Status */}
-                <CallStatus status={agentStatus} />
+                <CallStatus status={agentStatus}>
+                  <OrderDetails />
+                </CallStatus>
               </div>
             </div>
             {/* Debug View */}

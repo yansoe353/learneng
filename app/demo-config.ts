@@ -1,4 +1,4 @@
-import { DemoConfig } from "@/lib/types";
+import { DemoConfig, ParameterLocation, SelectedTool } from "@/lib/types";
 
 function getSystemPrompt() {
   let sysPrompt: string;
@@ -29,16 +29,19 @@ function getSystemPrompt() {
     When talking with the user, use the following script:
     1. Take their order, acknowledging each item as it is ordered. If it's not clear which menu item the user is ordering, ask them to clarify.
       DO NOT add an item to the order unless it's one of the items on the menu below.
-    2. Once the order is complete, repeat back the order.
-    2a. If the user only ordered a drink, ask them if they would like to add a donut to their order.
-    2b. If the user only ordered donuts, ask them if they would like to add a drink to their order.
-    2c. If the user ordered both drinks and donuts, don't suggest anything.
-    3. Total up the price of all ordered items and inform the user.
-    4. Ask the user to pull up to the drive thru window.
+    2. Any time you get an item from the user, you must call the function 'updateOrder'.
+    3. Once the order is complete, repeat back the order.
+    3a. If the user only ordered a drink, ask them if they would like to add a donut to their order.
+    3b. If the user only ordered donuts, ask them if they would like to add a drink to their order.
+    3c. If the user ordered both drinks and donuts, don't suggest anything.
+    4. Total up the price of all ordered items and inform the user.
+    5. Ask the user to pull up to the drive thru window.
     If the user asks for something that's not on the menu, inform them of that fact, and suggest the most similar item on the menu.
     If the user says something unrelated to your role, responed with "Um... this is a Dr. Donut."
     If the user says "thank you", respond with "My pleasure."
     If the user asks about what's on the menu, DO NOT read the entire menu to them. Instead, give a couple suggestions.
+
+    IMPORTANT: Use the tool called 'updateOrder' any time the user adds or removes items to/from their order.
 
     The menu of available items is as follows:
 
@@ -74,6 +77,37 @@ function getSystemPrompt() {
   return sysPrompt;
 }
 
+const selectedTools: SelectedTool[] = [
+  {
+    "temporaryTool": {
+      "modelToolName": "updateOrder",
+      "description": "Update order details. Used any time items are added or removed or when the order is finalized. Call this any time the user updates their order.",      
+      "dynamicParameters": [
+        {
+          "name": "orderDetailsData",
+          "location": ParameterLocation.BODY,
+          "schema": {
+            "description": "An array of objects contain order items.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "description": "The name of the item to be added to the order." },
+                "quantity": { "type": "number", "description": "The quantity of the item for the order." },
+                "specialInstructions": { "type": "string", "description": "Any special instructions that pertain to the item." },
+                "price": { "type": "number", "description": "The unit price for the item." },
+              },
+              "required": ["name", "quantity", "price"]
+            }
+          },
+          "required": true
+        },
+      ],
+      "client": {}
+    }
+  },
+];
+
 export const demoConfig: DemoConfig = {
   title: "Dr. Donut",
   overview: "This agent has been prompted to facilitate orders at a fictional drive-thru called Dr. Donut.",
@@ -81,6 +115,7 @@ export const demoConfig: DemoConfig = {
     systemPrompt: getSystemPrompt(),
     model: "fixie-ai/ultravox-70B",
     languageHint: "en",
+    selectedTools: selectedTools,
     voice: "terrence",
     temperature: 0.4
   }
