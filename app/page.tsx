@@ -1,56 +1,53 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation'; 
-import { startCall, endCall } from '@/lib/callFunctions'
-import { CallConfig, SelectedTool } from '@/lib/types'
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { 
+  Role,                              // 用于定义角色（user/assistant）
+  Transcript,                        // 对话记录类型
+  UltravoxSessionStatus,             // 会话状态类型
+  UltravoxExperimentalMessageEvent   // 调试消息事件类型
+} from 'ultravox-client';
+import { startCall, endCall } from '@/lib/callFunctions';
 import demoConfig from './demo-config';
-import { Role, Transcript, UltravoxExperimentalMessageEvent, UltravoxSessionStatus } from 'ultravox-client';
-import BorderedImage from '@/app/components/BorderedImage';
-import UVLogo from '@/public/UVMark-White.svg';
-import CallStatus from './components/CallStatus';
-import DebugMessages from '@/app/components/DebugMessages';
 import MicToggleButton from './components/MicToggleButton';
-import { PhoneOffIcon } from 'lucide-react';
-import OrderDetails from './components/OrderDetails';
+import CallDuration from './components/CallDuration';
+import SpeakingIndicator from './components/SpeakingIndicator';
+import CallStatus from './components/CallStatus';
+import ConversationDisplay from './components/ConversationDisplay';
+import DebugMessages from './components/DebugMessages';
+import Header from './components/Header';
+import InfoWindow from './components/InfoWindow';
+import BorderedImage from './components/BorderedImage';
+import { Sun, Moon } from 'lucide-react';
+import ToolResults from './components/ToolResults';
 
-type SearchParamsProps = {
-  showMuteSpeakerButton: boolean;
-  modelOverride: string | undefined;
-  showDebugMessages: boolean;
-  showUserTranscripts: boolean;
-};
-
-type SearchParamsHandlerProps = {
-  children: (props: SearchParamsProps) => React.ReactNode;
-};
-
-function SearchParamsHandler({ children }: SearchParamsHandlerProps) {
-  // Process query params to see if we want to change the behavior for showing speaker mute button or changing the model
-  const searchParams = useSearchParams();
-  const showMuteSpeakerButton = searchParams.get('showSpeakerMute') === 'true';
-  const showDebugMessages = searchParams.get('showDebugMessages') === 'true';
-  const showUserTranscripts = searchParams.get('showUserTranscripts') === 'true';
-  let modelOverride: string | undefined;
-  
-  if (searchParams.get('model')) {
-    modelOverride = "fixie-ai/" + searchParams.get('model');
-  }
-
-  return children({ showMuteSpeakerButton, modelOverride, showDebugMessages, showUserTranscripts });
-}
-
-export default function Home() {
+export default function App() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [agentStatus, setAgentStatus] = useState<string>('off');
-  const [callTranscript, setCallTranscript] = useState<Transcript[] | null>([]);
-  const [callDebugMessages, setCallDebugMessages] = useState<UltravoxExperimentalMessageEvent[]>([]);
-  const [customerProfileKey, setCustomerProfileKey] = useState<string | null>(null);
+  const [currentText, setCurrentText] = useState('');
+  const [duration, setDuration] = useState(0);
+  const [callTranscript, setCallTranscript] = useState<Transcript[] | null>(null);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
-  
+  const [corrections, setCorrections] = useState<string[]>([]);
+  const [debugMessages, setDebugMessages] = useState<string[]>([]);
+  const [isDark, setIsDark] = useState(false);
+  const [toolResults, setToolResults] = useState<{
+    speechAnalysis?: any;
+    corrections?: any[];
+  }>({});
+  const [aiResponse, setAiResponse] = useState<string>('');
+  const [chatHistory, setChatHistory] = useState<Array<{
+    role: 'ai' | 'user';
+    message: string;
+    timestamp: number;
+  }>>([]);
+
   useEffect(() => {
     if (transcriptContainerRef.current) {
-      transcriptContainerRef.current.scrollTop = transcriptContainerRef.current.scrollHeight;
+      transcriptContainerRef.current.scrollTo({
+        top: transcriptContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [callTranscript]);
 
@@ -60,171 +57,237 @@ export default function Home() {
     } else {
       setAgentStatus('off');
     }
-    
   }, []);
 
   const handleTranscriptChange = useCallback((transcripts: Transcript[] | undefined) => {
-    if(transcripts) {
-      setCallTranscript([...transcripts]);
+    if (transcripts) {
+      const transcriptsWithMeta = transcripts.map((t, index) => ({
+        ...t,
+        isLatest: index === transcripts.length - 1
+      }));
+      setCallTranscript(transcriptsWithMeta);
     }
   }, []);
 
-  const handleDebugMessage = useCallback((debugMessage: UltravoxExperimentalMessageEvent) => {
-    setCallDebugMessages(prevMessages => [...prevMessages, debugMessage]);
+  const handleDebugMessage = useCallback((message: UltravoxExperimentalMessageEvent) => {
+    console.log('Debug message received:', message);
+    if (message.message?.type === 'debug' && message.message.message?.startsWith('LLM response:')) {
+      const responseText = message.message.message
+        .replace('LLM response: ', '')
+        .replace(/^"|"$/g, '');
+      
+      // 更新 transcript
+      setCallTranscript(prev => {
+        if (!prev) return [{
+          speaker: 'agent',
+          text: responseText,
+          timestamp: new Date().toISOString()
+        }];
+        
+        return [...prev, {
+          speaker: 'agent',
+          text: responseText,
+          timestamp: new Date().toISOString()
+        }];
+      });
+    }
   }, []);
 
-  const clearCustomerProfile = useCallback(() => {
-    // This will trigger a re-render of CustomerProfileForm with a new empty profile
-    setCustomerProfileKey(prev => prev ? `${prev}-cleared` : 'cleared');
-  }, []);
-
-  const handleStartCallButtonClick = async (modelOverride?: string, showDebugMessages?: boolean) => {
+  const startAudioCall = async () => {
     try {
       handleStatusChange('Starting call...');
       setCallTranscript(null);
-      setCallDebugMessages([]);
-      clearCustomerProfile();
 
-      // Generate a new key for the customer profile
-      const newKey = `call-${Date.now()}`;
-      setCustomerProfileKey(newKey);
-
-      // Setup our call config including the call key as a parameter restriction
-      let callConfig: CallConfig = {
-        systemPrompt: demoConfig.callConfig.systemPrompt,
-        model: modelOverride || demoConfig.callConfig.model,
-        languageHint: demoConfig.callConfig.languageHint,
-        voice: demoConfig.callConfig.voice,
-        temperature: demoConfig.callConfig.temperature,
-        maxDuration: demoConfig.callConfig.maxDuration,
-        timeExceededMessage: demoConfig.callConfig.timeExceededMessage
-      };
-
-      const paramOverride: { [key: string]: any } = {
-        "callId": newKey
-      }
-
-      let cpTool: SelectedTool | undefined = demoConfig?.callConfig?.selectedTools?.find(tool => tool.toolName === "createProfile");
-      
-      if (cpTool) {
-        cpTool.parameterOverrides = paramOverride;
-      }
-      callConfig.selectedTools = demoConfig.callConfig.selectedTools;
-
-      await startCall({
+      const callbacks = {
         onStatusChange: handleStatusChange,
         onTranscriptChange: handleTranscriptChange,
         onDebugMessage: handleDebugMessage
-      }, callConfig, showDebugMessages);
+      };
+
+      await startCall(callbacks, demoConfig.callConfig);
 
       setIsCallActive(true);
       handleStatusChange('Call started successfully');
     } catch (error) {
+      console.error('Failed to start call:', error);
       handleStatusChange(`Error starting call: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
-  const handleEndCallButtonClick = async () => {
+  const stopAudioCall = async () => {
     try {
       handleStatusChange('Ending call...');
       await endCall();
       setIsCallActive(false);
-
-      clearCustomerProfile();
-      setCustomerProfileKey(null);
+      setDuration(0);
       handleStatusChange('Call ended successfully');
     } catch (error) {
+      console.error('结束通话失败:', error);
       handleStatusChange(`Error ending call: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
+  const handleToggle = () => {
+    if (isCallActive) {
+      stopAudioCall();
+    } else {
+      startAudioCall();
+    }
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isCallActive) {
+      timer = setInterval(() => {
+        setDuration(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isCallActive]);
+
+  useEffect(() => {
+    if (agentStatus) {
+      setDebugMessages(prev => [...prev, `Agent Status: ${agentStatus}`]);
+    }
+  }, [agentStatus]);
+
+  useEffect(() => {
+    if (currentText) {
+      setDebugMessages(prev => [...prev, `Message: ${currentText}`]);
+    }
+  }, [currentText]);
+
+  useEffect(() => {
+    console.log('callTranscript changed:', callTranscript);
+  }, [callTranscript]);
+
+  useEffect(() => {
+    // 检查系统主题偏好
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+    
+    // 检查本地存储的主题设置
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    if (!isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SearchParamsHandler>
-        {({ showMuteSpeakerButton, modelOverride, showDebugMessages, showUserTranscripts }: SearchParamsProps) => (
-          <div className="flex flex-col items-center justify-center">
-            {/* Main Area */}
-            <div className="max-w-[1206px] mx-auto w-full py-5 pl-5 pr-[10px] border border-[#2A2A2A] rounded-[3px]">
-              <div className="flex flex-col justify-center lg:flex-row ">
-                {/* Action Area */}
-                <div className="w-full lg:w-2/3">
-                  <h1 className="text-2xl font-bold w-full">{demoConfig.title}</h1>
-                  <div className="flex flex-col justify-between items-start h-full font-mono p-4 ">
-                    <div className="mt-20 self-center">
-                      <BorderedImage
-                        src={UVLogo}
-                        alt="todo"
-                        size="md"
-                      />
-                    </div>
-                    {isCallActive ? (
-                      <div className="w-full">
-                        <div className="mb-5 relative">
-                          <div 
-                            ref={transcriptContainerRef}
-                            className="h-[300px] p-2.5 overflow-y-auto relative"
-                          >
-                            {callTranscript && callTranscript.map((transcript, index) => (
-                              <div key={index}>
-                                {showUserTranscripts ? (
-                                  <>
-                                    <p><span className="text-gray-600">{transcript.speaker === 'agent' ? "Ultravox" : "User"}</span></p>
-                                    <p className="mb-4"><span>{transcript.text}</span></p>
-                                  </>
-                                ) : (
-                                  transcript.speaker === 'agent' && (
-                                    <>
-                                      <p><span className="text-gray-600">{transcript.speaker === 'agent' ? "Ultravox" : "User"}</span></p>
-                                      <p className="mb-4"><span>{transcript.text}</span></p>
-                                    </>
-                                  )
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-t from-transparent to-black pointer-events-none" />
-                        </div>
-                        <div className="flex justify-between space-x-4 p-4 w-full">
-                          <MicToggleButton role={Role.USER}/>
-                          { showMuteSpeakerButton && <MicToggleButton role={Role.AGENT}/> }
-                          <button
-                            type="button"
-                            className="flex-grow flex items-center justify-center h-10 bg-red-500"
-                            onClick={handleEndCallButtonClick}
-                            disabled={!isCallActive}
-                          >
-                            <PhoneOffIcon width={24} className="brightness-0 invert" />
-                            <span className="ml-2">End Call</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="h-[300px] text-gray-400 mb-6 mt-32 lg:mt-0">
-                          {demoConfig.overview}
-                        </div>
-                        <button
-                          type="button"
-                          className="hover:bg-gray-700 px-6 py-2 border-2 w-full mb-4"
-                          onClick={() => handleStartCallButtonClick(modelOverride, showDebugMessages)}
-                        >
-                          Start Call
-                        </button>
-                      </div>
-                    )}
-                  </div>
+    <main className="min-h-screen">
+      <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-500">
+              Winko.AI English Partner
+            </h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-300 text-lg">
+              Your AI-powered language learning companion
+            </p>
+          </div>
+          
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-6">
+          <div 
+            ref={transcriptContainerRef}
+            className="h-[500px] overflow-y-auto space-y-4 mb-4 p-4"
+          >
+            <ConversationDisplay
+              ref={transcriptContainerRef}
+              transcript={callTranscript}
+              currentText={currentText}
+            >
+              {chatHistory.map((chat, index) => (
+                <div 
+                  key={chat.timestamp}
+                  className={`mb-4 transition-opacity duration-200 ${
+                    index === chatHistory.length - 1 
+                      ? 'text-gray-200' 
+                      : 'text-gray-400'
+                  }`}
+                >
+                  <p className="text-sm font-medium">
+                    {chat.role === 'ai' ? 'AI Assistant' : 'You'}
+                  </p>
+                  <p className="mt-1">{chat.message}</p>
                 </div>
-                {/* Call Status */}
-                <CallStatus status={agentStatus}>
-                  <OrderDetails />
-                </CallStatus>
-              </div>
-            </div>
-            {/* Debug View */}
-            <DebugMessages debugMessages={callDebugMessages} />
+              ))}
+            </ConversationDisplay>
+          </div>
+
+          <div className="flex gap-4 mt-6">
+            <button
+              onClick={handleToggle}
+              disabled={isCallActive}
+              className={`flex-1 h-12 rounded-xl font-medium transition-all
+                ${isCallActive 
+                  ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
+                }`}
+            >
+              Start Conversation
+            </button>
+            <button
+              onClick={stopAudioCall}
+              disabled={!isCallActive}
+              className={`flex-1 h-12 rounded-xl font-medium transition-all
+                ${!isCallActive
+                  ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
+                  : 'bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl'
+                }`}
+            >
+              End Call
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl">
+          <div className="flex items-center space-x-2">
+            <SpeakingIndicator agentStatus={agentStatus} />
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              {agentStatus}
+            </span>
+          </div>
+          {isCallActive && (
+            <CallDuration duration={duration} />
+          )}
+        </div>
+        
+        {aiResponse && (
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">AI Assistant</p>
+            <p className="text-gray-800 dark:text-gray-200">{aiResponse}</p>
           </div>
         )}
-      </SearchParamsHandler>
-    </Suspense>
-  )
+        
+        <ToolResults 
+          speechAnalysis={toolResults.speechAnalysis}
+          corrections={toolResults.corrections}
+        />
+      </div>
+    </main>
+  );
 }

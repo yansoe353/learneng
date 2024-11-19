@@ -131,15 +131,3 @@ export interface DemoConfig {
   overview: string;
   callConfig: CallConfig;
 }
-
-// For our order details component
-export interface OrderItem {
-  name: string;
-  quantity: number;
-  specialInstructions?: string;
-  price: number;
-}
-export interface OrderDetailsData {
-  items: OrderItem[];
-  totalAmount: number;
-}

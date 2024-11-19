@@ -17,8 +17,19 @@ const config: Config = {
         sans: ['ReplicaLL'],
         mono: ['ReplicaLLMono'],
       },
+      colors: {
+        primary: {
+          50: '#f0f9ff',
+          // ... 其他色阶
+          500: '#0284c7',
+        }
+      },
+      animation: {
+        'bounce-delayed': 'bounce 1s infinite 0.2s',
+      }
     },
   },
   plugins: [],
+  darkMode: 'class',
 };
 export default config;

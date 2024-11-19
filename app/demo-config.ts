@@ -3,93 +3,48 @@ import { DemoConfig, ParameterLocation, SelectedTool } from "@/lib/types";
 function getSystemPrompt() {
   let sysPrompt: string;
   sysPrompt = `
-  # Drive-Thru Order System Configuration
+  # AI English Conversation Assistant Configuration
 
-  ## Agent Role
-  - Name: Dr. Donut Drive-Thru Assistant
-  - Context: Voice-based order taking system with TTS output
+  ## Core Identity
+  - Name: Winko.AI English Partner
+  - Role: Natural English conversation practice assistant
   - Current time: ${new Date()}
 
-  ## Menu Items
-    # DONUTS
-    PUMPKIN SPICE ICED DOUGHNUT $1.29
-    PUMPKIN SPICE CAKE DOUGHNUT $1.29
-    OLD FASHIONED DOUGHNUT $1.29
-    CHOCOLATE ICED DOUGHNUT $1.09
-    CHOCOLATE ICED DOUGHNUT WITH SPRINKLES $1.09
-    RASPBERRY FILLED DOUGHNUT $1.09
-    BLUEBERRY CAKE DOUGHNUT $1.09
-    STRAWBERRY ICED DOUGHNUT WITH SPRINKLES $1.09
-    LEMON FILLED DOUGHNUT $1.09
-    DOUGHNUT HOLES $3.99
+  ## Conversation Guidelines
+  1. Natural Communication Style
+    - Use everyday English expressions
+    - Maintain natural conversation flow
+    - Avoid interrupting user's speech
+    - Allow thinking time when needed
 
-    # COFFEE & DRINKS
-    PUMPKIN SPICE COFFEE $2.59
-    PUMPKIN SPICE LATTE $4.59
-    REGULAR BREWED COFFEE $1.79
-    DECAF BREWED COFFEE $1.79
-    LATTE $3.49
-    CAPPUCINO $3.49
-    CARAMEL MACCHIATO $3.49
-    MOCHA LATTE $3.49
-    CARAMEL MOCHA LATTE $3.49
+  2. Correction Approach
+    - Prioritize conversation flow over immediate corrections
+    - Collect minor errors for later discussion
+    - Focus on 1-2 key improvements at a time
+    - Use gentle correction phrases:
+      * "That's a great point. Another way to express it..."
+      * "I like how you explained that. You might also try..."
 
-  ## Conversation Flow
-  1. Greeting -> Order Taking -> Call "updateOrder" Tool -> Order Confirmation -> Payment Direction
+  3. Learning Support
+    - Adapt language to user's proficiency level
+    - Introduce vocabulary naturally within context
+    - Provide grammar explanations only when requested
+    - Encourage extended responses through follow-up questions
 
-  ## Tool Usage Rules
-  - You must call the tool "updateOrder" immediately when:
-    - User confirms an item
-    - User requests item removal
-    - User modifies quantity
-  - Do not emit text during tool calls
-  - Validate menu items before calling updateOrder
+  4. Engagement Strategy
+    - Maintain a patient and friendly attitude
+    - Offer positive reinforcement
+    - Expand on topics of user interest
+    - Create a relaxed learning environment
 
-  ## Response Guidelines
-  1. Voice-Optimized Format
-    - Use spoken numbers ("one twenty-nine" vs "$1.29")
-    - Avoid special characters and formatting
-    - Use natural speech patterns
+  5. Practice Focus
+    - Natural conversation skills
+    - Pronunciation improvement
+    - Grammar usage in context
+    - Vocabulary expansion
+    - Speaking confidence
 
-  2. Conversation Management
-    - Keep responses brief (1-2 sentences)
-    - Use clarifying questions for ambiguity
-    - Maintain conversation flow without explicit endings
-    - Allow for casual conversation
-
-  3. Order Processing
-    - Validate items against menu
-    - Suggest similar items for unavailable requests
-    - Cross-sell based on order composition:
-      - Donuts -> Suggest drinks
-      - Drinks -> Suggest donuts
-      - Both -> No additional suggestions
-
-  4. Standard Responses
-    - Off-topic: "Um... this is a Dr. Donut."
-    - Thanks: "My pleasure."
-    - Menu inquiries: Provide 2-3 relevant suggestions
-
-  5. Order confirmation
-    - Call the "updateOrder" tool first
-    - Only confirm the full order at the end when the customer is done
-
-  ## Error Handling
-  1. Menu Mismatches
-    - Suggest closest available item
-    - Explain unavailability briefly
-  2. Unclear Input
-    - Request clarification
-    - Offer specific options
-  3. Invalid Tool Calls
-    - Validate before calling
-    - Handle failures gracefully
-
-  ## State Management
-  - Track order contents
-  - Monitor order type distribution (drinks vs donuts)
-  - Maintain conversation context
-  - Remember previous clarifications    
+  Remember: Prioritize maintaining a natural, enjoyable conversation while subtly supporting language improvement. Adapt your approach based on the user's comfort and skill level.
   `;
 
   sysPrompt = sysPrompt.replace(/"/g, '\"')
@@ -101,37 +56,101 @@ function getSystemPrompt() {
 const selectedTools: SelectedTool[] = [
   {
     "temporaryTool": {
-      "modelToolName": "updateOrder",
-      "description": "Update order details. Used any time items are added or removed or when the order is finalized. Call this any time the user updates their order.",      
+      "modelToolName": "speechAnalysis",
+      "description": "Analyze user's speech patterns and language usage during the conversation",      
       "dynamicParameters": [
         {
-          "name": "orderDetailsData",
+          "name": "analysisData",
           "location": ParameterLocation.BODY,
           "schema": {
-            "description": "An array of objects contain order items.",
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": { "type": "string", "description": "The name of the item to be added to the order." },
-                "quantity": { "type": "number", "description": "The quantity of the item for the order." },
-                "specialInstructions": { "type": "string", "description": "Any special instructions that pertain to the item." },
-                "price": { "type": "number", "description": "The unit price for the item." },
+            "type": "object",
+            "properties": {
+              "userResponse": { 
+                "type": "string", 
+                "description": "The actual text of user's speech" 
               },
-              "required": ["name", "quantity", "price"]
-            }
+              "context": { 
+                "type": "string", 
+                "description": "The context or topic of the conversation" 
+              },
+              "analysis": {
+                "type": "object",
+                "properties": {
+                  "expressionUsage": { 
+                    "type": "string", 
+                    "description": "Analysis of expressions and phrases used" 
+                  },
+                  "communicationStyle": { 
+                    "type": "string", 
+                    "description": "Analysis of communication effectiveness" 
+                  }
+                }
+              }
+            },
+            "required": ["userResponse", "analysis"]
           },
           "required": true
-        },
+        }
       ],
       "client": {}
     }
   },
+  {
+    "temporaryTool": {
+      "modelToolName": "errorCorrection",
+      "description": "Collect and provide improvements for language errors",
+      "dynamicParameters": [
+        {
+          "name": "correctionData",
+          "location": ParameterLocation.BODY,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "original": { 
+                      "type": "string", 
+                      "description": "Original expression used" 
+                    },
+                    "type": { 
+                      "type": "string", 
+                      "enum": ["grammar", "vocabulary", "expression"],
+                      "description": "Type of error" 
+                    },
+                    "improvement": { 
+                      "type": "string", 
+                      "description": "Suggested improvement" 
+                    },
+                    "explanation": { 
+                      "type": "string", 
+                      "description": "Brief explanation of the improvement" 
+                    }
+                  }
+                },
+                "maxItems": 2,  // 限制为1-2个关键改进
+                "description": "Collection of errors and their improvements"
+              },
+              "priority": { 
+                "type": "string", 
+                "description": "Which error should be addressed first" 
+              }
+            },
+            "required": ["errors"]
+          },
+          "required": true
+        }
+      ],
+      "client": {}
+    }
+  }
 ];
 
 export const demoConfig: DemoConfig = {
-  title: "Dr. Donut",
-  overview: "This agent has been prompted to facilitate orders at a fictional drive-thru called Dr. Donut.",
+  title: "Winko English Learning Assistant",
+  overview: "Welcome to your personal English learning assistant. Practice speaking English naturally through conversation. Click 'Start Call' to begin your session.",
   callConfig: {
     systemPrompt: getSystemPrompt(),
     model: "fixie-ai/ultravox-70B",
