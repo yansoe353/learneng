@@ -1,20 +1,37 @@
-# ultravox-demo-template-vercel
-Template for creating Ultravox demo that gets deployed to Vercel.
+# Winko.AI English Partner
 
-This was bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+An AI-powered English conversation practice assistant built with Next.js and Ultravox voice chat technology.
 
-## Set-up
-1. Add API key to .env.local
-1. Configure settings in demo-config.ts
+## Features
 
-## Deployment
-1. Clone
-1. Vercel set env vars
+- 🎯 Real-time English conversation practice
+- 🎙️ Voice-based natural interaction
+- 🤖 AI-powered language correction
+- 📊 Speech analysis and feedback
+- 🌓 Dark/Light theme support
+- ⚡ Real-time transcription
+- 📝 Conversation history tracking
+- 🔍 Detailed feedback on pronunciation and grammar
 
-## Query Params
-| What | Parameter | Notes |
-|--------|--------|---------|
-|**Debug Logging**|`showDebugMessages=true`| Turns on some additional console logging.|
-|**Speaker Mute Toggle**|`showSpeakerMute=true`| Shows the speaker mute button.|
-|**Change Model**|`model=ultravox-70B`|Changes the model to what is specified. Note: the app will prepend `fixie-ai/` to the value.|
-|**Enable User Transcripts**|`showUserTranscripts=true`|Displays user transcripts. Otherwise, only Ultravox/agent transcripts are shown.|
+## Tech Stack
+
+- Next.js 14 (App Router)
+- TypeScript
+- Ultravox Client SDK
+- Tailwind CSS
+- Lucide Icons
+
+## Prerequisites
+
+- Node.js 16.x or later
+- Ultravox API key
+- Modern web browser with microphone support
+
+## Getting Started
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/foreveryh/winko-ai-english-partner
+cd winko-ai-english-partner
+```

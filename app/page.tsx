@@ -15,9 +15,6 @@ import SpeakingIndicator from './components/SpeakingIndicator';
 import CallStatus from './components/CallStatus';
 import ConversationDisplay from './components/ConversationDisplay';
 import DebugMessages from './components/DebugMessages';
-import Header from './components/Header';
-import InfoWindow from './components/InfoWindow';
-import BorderedImage from './components/BorderedImage';
 import { Sun, Moon } from 'lucide-react';
 import ToolResults from './components/ToolResults';
 
