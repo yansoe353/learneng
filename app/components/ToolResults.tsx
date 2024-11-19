@@ -13,8 +13,8 @@ interface ToolResultsProps {
   }>;
 }
 
-const ToolResults: React.FC<ToolResultsProps> = ({ speechAnalysis, corrections }) => {
-  if (!speechAnalysis && !corrections?.length) return null;
+const ToolResults: React.FC<ToolResultsProps> = ({ speechAnalysis, corrections = [] }) => {
+  if (!speechAnalysis && !corrections.length) return null;
 
   return (
     <div className="mt-4 p-4 bg-white/80 dark:bg-gray-800/80 rounded-lg shadow-sm backdrop-blur-sm">
@@ -34,7 +34,7 @@ const ToolResults: React.FC<ToolResultsProps> = ({ speechAnalysis, corrections }
         </div>
       )}
       
-      {corrections?.length > 0 && (
+      {corrections.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Suggested Improvements
