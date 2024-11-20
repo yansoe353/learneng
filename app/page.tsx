@@ -365,10 +365,8 @@ export default function App() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">AI Assistant</p>
             <p className="text-gray-800 dark:text-gray-200">{aiResponse}</p>
           </div>
-        )}
-        
-        <ToolStatusIndicator toolResults={toolResults} />
-        
+        )} 
+        {/* <ToolStatusIndicator toolResults={toolResults} /> */}
         {/* <DebugMessages debugMessages={callDebugMessages} /> */}
       </div>
     </main>
