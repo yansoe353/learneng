@@ -20,6 +20,26 @@ import { Sun, Moon } from 'lucide-react';
 import ToolResults from './components/ToolResults';
 import ToolStatusIndicator from './components/ToolStatusIndicator';
 
+// 定义符合工具配置的类型
+interface SpeechAnalysisItem {
+  text: string;
+  score: number;
+  feedback: string;
+  category?: string;  // 可选，因为不在 required 列表中
+}
+
+interface ErrorCorrectionItem {
+  text: string;
+  type: string;
+  correction: string;
+  explanation?: string;  // 可选，因为不在 required 列表中
+}
+
+interface ToolResults {
+  speechAnalysis?: SpeechAnalysisItem[];  // 注意这里是数组
+  corrections?: ErrorCorrectionItem[];
+}
+
 export default function App() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [agentStatus, setAgentStatus] = useState<string>('off');
@@ -30,18 +50,7 @@ export default function App() {
   const [corrections, setCorrections] = useState<string[]>([]);
   const [debugMessages, setDebugMessages] = useState<string[]>([]);
   const [isDark, setIsDark] = useState(false);
-  const [toolResults, setToolResults] = useState<{
-    speechAnalysis?: {
-      expressionUsage: string;
-      communicationStyle: string;
-    };
-    corrections?: Array<{
-      original: string;
-      type: 'grammar' | 'vocabulary' | 'expression';
-      improvement: string;
-      explanation: string;
-    }>;
-  }>({});
+  const [toolResults, setToolResults] = useState<ToolResults>({});
   const [aiResponse, setAiResponse] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<Array<{
     role: 'ai' | 'user';
@@ -92,15 +101,15 @@ export default function App() {
       switch (toolResponse.tool) {
         case 'speechAnalysis':
           const analysisData = toolResponse.response?.analysisData;
-          if (analysisData?.analysis) {
+          if (analysisData) {
             setToolResults(prev => ({
               ...prev,
-              speechAnalysis: {
-                text: analysisData.text,
-                score: analysisData.score,
-                feedback: analysisData.feedback,
+              speechAnalysis: Array.isArray(analysisData) ? analysisData : [{
+                text: analysisData.text || '',
+                score: analysisData.score || 0,
+                feedback: analysisData.feedback || '',
                 category: analysisData.category
-              }
+              }]
             }));
           }
           break;
@@ -110,10 +119,10 @@ export default function App() {
           if (correctionData) {
             setToolResults(prev => ({
               ...prev,
-              corrections: [{
-                original: correctionData.text,
-                type: correctionData.type as 'grammar' | 'vocabulary' | 'expression',
-                improvement: correctionData.correction,
+              corrections: Array.isArray(correctionData) ? correctionData : [{
+                text: correctionData.text || '',
+                type: correctionData.type || 'grammar',
+                correction: correctionData.correction || '',
                 explanation: correctionData.explanation
               }]
             }));
@@ -257,7 +266,7 @@ export default function App() {
       alert(`收到语音分析结果：\n${JSON.stringify(event.detail, null, 2)}`);
       setToolResults(prev => ({
         ...prev,
-        speechAnalysis: event.detail
+        speechAnalysis: Array.isArray(event.detail) ? event.detail : [event.detail]
       }));
     };
 
@@ -267,7 +276,7 @@ export default function App() {
       alert(`收到错误纠正结果：\n${JSON.stringify(event.detail, null, 2)}`);
       setToolResults(prev => ({
         ...prev,
-        corrections: event.detail
+        corrections: Array.isArray(event.detail) ? event.detail : [event.detail]
       }));
     };
 

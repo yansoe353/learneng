@@ -1,14 +1,36 @@
 import React, { forwardRef, useRef } from 'react';
 import { Transcript } from 'ultravox-client';
 
+// 首先定义 ToolResults 接口
+interface SpeechAnalysisItem {
+  text: string;
+  score: number;
+  feedback: string;
+  category?: string;
+}
+
+interface ErrorCorrectionItem {
+  text: string;
+  type: string;
+  correction: string;
+  explanation?: string;
+}
+
+interface ToolResults {
+  speechAnalysis?: SpeechAnalysisItem[];
+  corrections?: ErrorCorrectionItem[];
+}
+
+// 更新 props 接口
 interface ConversationDisplayProps {
   transcript: Transcript[] | null;
   currentText: string;
+  toolResults: ToolResults;  // 添加 toolResults
   children?: React.ReactNode;
 }
 
 const ConversationDisplay = forwardRef<HTMLDivElement, ConversationDisplayProps>(
-  ({ transcript, currentText }, ref) => {
+  ({ transcript, currentText, toolResults }, ref) => {
     const latestMessageRef = useRef<HTMLDivElement>(null);
 
     return (
