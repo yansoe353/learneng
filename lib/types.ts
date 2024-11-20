@@ -131,3 +131,22 @@ export interface DemoConfig {
   overview: string;
   callConfig: CallConfig;
 }
+
+export interface SpeechAnalysisItem {
+  text: string;
+  score: number;
+  feedback: string;
+  category?: string;
+}
+
+export interface ErrorCorrectionItem {
+  text: string;
+  type: string;
+  correction: string;
+  explanation?: string;
+}
+
+export interface ToolResults {
+  speechAnalysis?: (string | SpeechAnalysisItem)[];
+  corrections?: (string | ErrorCorrectionItem)[];
+}

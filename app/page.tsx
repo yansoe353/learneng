@@ -6,8 +6,12 @@ import {
   Transcript,                        // 对话记录类型
   UltravoxSessionStatus,             // 会话状态类型
   UltravoxExperimentalMessageEvent,    // 调试消息事件类型
-  Medium
-} from 'ultravox-client';
+} from 'ultravox-client'; 
+import {  
+  ToolResults,
+  SpeechAnalysisItem,
+  ErrorCorrectionItem 
+} from '@/lib/types';
 import { startCall, endCall } from '@/lib/callFunctions';
 import demoConfig from './demo-config';
 import MicToggleButton from './components/MicToggleButton';
@@ -17,28 +21,7 @@ import CallStatus from './components/CallStatus';
 import ConversationDisplay from './components/ConversationDisplay';
 import DebugMessages from './components/DebugMessages';
 import { Sun, Moon } from 'lucide-react';
-import ToolResults from './components/ToolResults';
 import ToolStatusIndicator from './components/ToolStatusIndicator';
-
-// 定义符合工具配置的类型
-interface SpeechAnalysisItem {
-  text: string;
-  score: number;
-  feedback: string;
-  category?: string;  // 可选，因为不在 required 列表中
-}
-
-interface ErrorCorrectionItem {
-  text: string;
-  type: string;
-  correction: string;
-  explanation?: string;  // 可选，因为不在 required 列表中
-}
-
-interface ToolResults {
-  speechAnalysis?: SpeechAnalysisItem[];  // 注意这里是数组
-  corrections?: ErrorCorrectionItem[];
-}
 
 export default function App() {
   const [isCallActive, setIsCallActive] = useState(false);
@@ -86,70 +69,70 @@ export default function App() {
     }
   }, []);
 
-  const handleDebugMessage = useCallback((message: UltravoxExperimentalMessageEvent) => {
-    if (message.target && 'registeredTools' in message.target) {
-      console.log('Registered Tools:', message.target.registeredTools);
-    }
+  // const handleDebugMessage = useCallback((message: UltravoxExperimentalMessageEvent) => {
+  //   if (message.target && 'registeredTools' in message.target) {
+  //     console.log('Registered Tools:', message.target.registeredTools);
+  //   }
     
-    setCallDebugMessages(prev => [...prev, message]);
+  //   setCallDebugMessages(prev => [...prev, message]);
     
-    // 处理工具响应
-    if (message.message?.type === 'tool_response') {
-      const toolResponse = message.message;
-      console.log('Tool Response:', toolResponse);
+  //   // 处理工具响应
+  //   if (message.message?.type === 'tool_response') {
+  //     const toolResponse = message.message;
+  //     console.log('Tool Response:', toolResponse);
       
-      switch (toolResponse.tool) {
-        case 'speechAnalysis':
-          const analysisData = toolResponse.response?.analysisData;
-          if (analysisData) {
-            setToolResults(prev => ({
-              ...prev,
-              speechAnalysis: Array.isArray(analysisData) ? analysisData : [{
-                text: analysisData.text || '',
-                score: analysisData.score || 0,
-                feedback: analysisData.feedback || '',
-                category: analysisData.category
-              }]
-            }));
-          }
-          break;
+  //     switch (toolResponse.tool) {
+  //       case 'speechAnalysis':
+  //         const analysisData = toolResponse.response?.analysisData;
+  //         if (analysisData) {
+  //           setToolResults(prev => ({
+  //             ...prev,
+  //             speechAnalysis: Array.isArray(analysisData) ? analysisData : [{
+  //               text: analysisData.text || '',
+  //               score: analysisData.score || 0,
+  //               feedback: analysisData.feedback || '',
+  //               category: analysisData.category
+  //             }]
+  //           }));
+  //         }
+  //         break;
           
-        case 'errorCorrection':
-          const correctionData = toolResponse.response?.correctionData;
-          if (correctionData) {
-            setToolResults(prev => ({
-              ...prev,
-              corrections: Array.isArray(correctionData) ? correctionData : [{
-                text: correctionData.text || '',
-                type: correctionData.type || 'grammar',
-                correction: correctionData.correction || '',
-                explanation: correctionData.explanation
-              }]
-            }));
-          }
-          break;
-      }
-    }
+  //       case 'errorCorrection':
+  //         const correctionData = toolResponse.response?.correctionData;
+  //         if (correctionData) {
+  //           setToolResults(prev => ({
+  //             ...prev,
+  //             corrections: Array.isArray(correctionData) ? correctionData : [{
+  //               text: correctionData.text || '',
+  //               type: correctionData.type || 'grammar',
+  //               correction: correctionData.correction || '',
+  //               explanation: correctionData.explanation
+  //             }]
+  //           }));
+  //         }
+  //         break;
+  //     }
+  //   }
 
-    // 处理 LLM 响应
-    if (message.message?.type === 'debug' && message.message.message?.startsWith('LLM response:')) {
-      const responseText = message.message.message
-        .replace('LLM response: ', '')
-        .replace(/^"|"$/g, '');
+  //   // 处理 LLM 响应
+  //   if (message.message?.type === 'debug' && message.message.message?.startsWith('LLM response:')) {
+  //     const responseText = message.message.message
+  //       .replace('LLM response: ', '')
+  //       .replace(/^"|"$/g, '');
       
-      setCallTranscript(prev => {
-        const newTranscript = new Transcript(
-          responseText,
-          true,
-          Role.AGENT,
-          Medium.TEXT
-        );
+  //     setCallTranscript(prev => {
+  //       const newTranscript = new Transcript(
+  //         responseText,
+  //         true,
+  //         Role.AGENT,
+  //         Medium.TEXT
+  //       );
 
-        if (!prev) return [newTranscript];
-        return [...prev, newTranscript];
-      });
-    }
-  }, []);
+  //       if (!prev) return [newTranscript];
+  //       return [...prev, newTranscript];
+  //     });
+  //   }
+  // }, []);
 
   const startAudioCall = async () => {
     try {
@@ -158,7 +141,6 @@ export default function App() {
       const callbacks = {
         onStatusChange: handleStatusChange,
         onTranscriptChange: handleTranscriptChange,
-        onDebugMessage: handleDebugMessage
       };
 
       await startCall(callbacks, demoConfig.callConfig, true);
@@ -263,7 +245,7 @@ export default function App() {
     // 监听语音分析事件
     const handleSpeechAnalysis = (event: CustomEvent) => {
       console.log('收到语音分析事件:', event.detail);
-      alert(`收到语音分析结果：\n${JSON.stringify(event.detail, null, 2)}`);
+      //alert(`收到语音分析结果：\n${JSON.stringify(event.detail, null, 2)}`);
       setToolResults(prev => ({
         ...prev,
         speechAnalysis: Array.isArray(event.detail) ? event.detail : [event.detail]
@@ -273,7 +255,7 @@ export default function App() {
     // 监听错误纠正事件
     const handleErrorCorrection = (event: CustomEvent) => {
       console.log('收到错误纠正事件:', event.detail);
-      alert(`收到错误纠正结果：\n${JSON.stringify(event.detail, null, 2)}`);
+      //alert(`收到错误纠正结果：\n${JSON.stringify(event.detail, null, 2)}`);
       setToolResults(prev => ({
         ...prev,
         corrections: Array.isArray(event.detail) ? event.detail : [event.detail]
@@ -290,6 +272,10 @@ export default function App() {
       window.removeEventListener('errorCorrectionUpdated', handleErrorCorrection as EventListener);
     };
   }, []);
+
+  useEffect(() => {
+    console.log('toolResults updated:', toolResults);
+  }, [toolResults]);
 
   return (
     <main className="min-h-screen">
@@ -383,7 +369,7 @@ export default function App() {
         
         <ToolStatusIndicator toolResults={toolResults} />
         
-        <DebugMessages debugMessages={callDebugMessages} />
+        {/* <DebugMessages debugMessages={callDebugMessages} /> */}
       </div>
     </main>
   );

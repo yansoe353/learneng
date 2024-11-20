@@ -39,15 +39,8 @@ export const errorCorrectionTool: ClientToolImplementation = (parameters) => {
   console.debug("Received error correction data:", correctionData.correctionData);
 
   if (typeof window !== "undefined") {
-    // 确保 correctionData 是数组
-    const corrections = Array.isArray(correctionData.correctionData) 
-      ? correctionData.correctionData 
-      : [correctionData.correctionData];
-    
-    console.log("Processed corrections array:", corrections);
-    
     const event = new CustomEvent("errorCorrectionUpdated", {
-      detail: corrections
+      detail: correctionData.correctionData,
     });
     console.log("Dispatching errorCorrectionUpdated event with data:", event.detail);
     window.dispatchEvent(event);
