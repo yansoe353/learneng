@@ -43,12 +43,16 @@ const DebugMessages: React.FC<DebugMessagesProps> = ({ debugMessages }) => {
           <div className="h-40">
             <div ref={scrollRef} className="h-full pr-2 scrollbar-visible">
               {messages.map((msg, index) => (
-                <p
-                  key={index}
-                  className="text-sm font-mono text-gray-200 py-2 border-dotted border-b border-[#3A3B3F]"
-                >
-                  {msg.message.message}
-                </p>
+                <div key={index} className="text-sm mb-2">
+                  {msg.message?.type === 'tool_response' && (
+                    <div className="text-blue-500">
+                      Tool Called: {msg.message.tool}
+                    </div>
+                  )}
+                  <pre className="whitespace-pre-wrap">
+                    {JSON.stringify(msg, null, 2)}
+                  </pre>
+                </div>
               ))}
             </div>
           </div>

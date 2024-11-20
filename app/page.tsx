@@ -5,7 +5,8 @@ import {
   Role,                              // 用于定义角色（user/assistant）
   Transcript,                        // 对话记录类型
   UltravoxSessionStatus,             // 会话状态类型
-  UltravoxExperimentalMessageEvent   // 调试消息事件类型
+  UltravoxExperimentalMessageEvent,    // 调试消息事件类型
+  Medium
 } from 'ultravox-client';
 import { startCall, endCall } from '@/lib/callFunctions';
 import demoConfig from './demo-config';
@@ -17,6 +18,7 @@ import ConversationDisplay from './components/ConversationDisplay';
 import DebugMessages from './components/DebugMessages';
 import { Sun, Moon } from 'lucide-react';
 import ToolResults from './components/ToolResults';
+import ToolStatusIndicator from './components/ToolStatusIndicator';
 
 export default function App() {
   const [isCallActive, setIsCallActive] = useState(false);
@@ -29,8 +31,16 @@ export default function App() {
   const [debugMessages, setDebugMessages] = useState<string[]>([]);
   const [isDark, setIsDark] = useState(false);
   const [toolResults, setToolResults] = useState<{
-    speechAnalysis?: any;
-    corrections?: any[];
+    speechAnalysis?: {
+      expressionUsage: string;
+      communicationStyle: string;
+    };
+    corrections?: Array<{
+      original: string;
+      type: 'grammar' | 'vocabulary' | 'expression';
+      improvement: string;
+      explanation: string;
+    }>;
   }>({});
   const [aiResponse, setAiResponse] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<Array<{
@@ -38,6 +48,7 @@ export default function App() {
     message: string;
     timestamp: number;
   }>>([]);
+  const [callDebugMessages, setCallDebugMessages] = useState<UltravoxExperimentalMessageEvent[]>([]);
 
   useEffect(() => {
     if (transcriptContainerRef.current) {
@@ -67,47 +78,102 @@ export default function App() {
   }, []);
 
   const handleDebugMessage = useCallback((message: UltravoxExperimentalMessageEvent) => {
-    console.log('Debug message received:', message);
+    if (message.target && 'registeredTools' in message.target) {
+      console.log('Registered Tools:', message.target.registeredTools);
+    }
+    
+    setCallDebugMessages(prev => [...prev, message]);
+    
+    // 处理工具响应
+    if (message.message?.type === 'tool_response') {
+      const toolResponse = message.message;
+      console.log('Tool Response:', toolResponse);
+      
+      switch (toolResponse.tool) {
+        case 'speechAnalysis':
+          const analysisData = toolResponse.response?.analysisData;
+          if (analysisData?.analysis) {
+            setToolResults(prev => ({
+              ...prev,
+              speechAnalysis: {
+                text: analysisData.text,
+                score: analysisData.score,
+                feedback: analysisData.feedback,
+                category: analysisData.category
+              }
+            }));
+          }
+          break;
+          
+        case 'errorCorrection':
+          const correctionData = toolResponse.response?.correctionData;
+          if (correctionData) {
+            setToolResults(prev => ({
+              ...prev,
+              corrections: [{
+                original: correctionData.text,
+                type: correctionData.type as 'grammar' | 'vocabulary' | 'expression',
+                improvement: correctionData.correction,
+                explanation: correctionData.explanation
+              }]
+            }));
+          }
+          break;
+      }
+    }
+
+    // 处理 LLM 响应
     if (message.message?.type === 'debug' && message.message.message?.startsWith('LLM response:')) {
       const responseText = message.message.message
         .replace('LLM response: ', '')
         .replace(/^"|"$/g, '');
       
-      // 更新 transcript
       setCallTranscript(prev => {
-        if (!prev) return [{
-          speaker: 'agent',
-          text: responseText,
-          timestamp: new Date().toISOString()
-        }];
-        
-        return [...prev, {
-          speaker: 'agent',
-          text: responseText,
-          timestamp: new Date().toISOString()
-        }];
+        const newTranscript = new Transcript(
+          responseText,
+          true,
+          Role.AGENT,
+          Medium.TEXT
+        );
+
+        if (!prev) return [newTranscript];
+        return [...prev, newTranscript];
       });
     }
   }, []);
 
   const startAudioCall = async () => {
     try {
-      handleStatusChange('Starting call...');
-      setCallTranscript(null);
-
+      //console.log('Starting call with tools:', demoConfig.callConfig.selectedTools);
+      
       const callbacks = {
         onStatusChange: handleStatusChange,
         onTranscriptChange: handleTranscriptChange,
         onDebugMessage: handleDebugMessage
       };
 
-      await startCall(callbacks, demoConfig.callConfig);
-
+      await startCall(callbacks, demoConfig.callConfig, true);
       setIsCallActive(true);
       handleStatusChange('Call started successfully');
     } catch (error) {
       console.error('Failed to start call:', error);
-      handleStatusChange(`Error starting call: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // 添加错误消息处理逻辑
+      let userFriendlyMessage = 'An error occurred while starting the call';
+      
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        
+        if (errorMessage.includes('402') || 
+            errorMessage.includes('subscription') || 
+            errorMessage.includes('set up your subscription')) {
+          userFriendlyMessage = 'The conversation limit has been reached. Please contact the administrator to continue using.';
+        } else if (errorMessage.includes('500')) {
+          userFriendlyMessage = 'The server is temporarily unable to respond. Please try again later.';
+        }
+      }
+      
+      handleStatusChange(userFriendlyMessage);
     }
   };
 
@@ -119,7 +185,7 @@ export default function App() {
       setDuration(0);
       handleStatusChange('Call ended successfully');
     } catch (error) {
-      console.error('结束通话失败:', error);
+      console.error('Error ending call:', error);
       handleStatusChange(`Error ending call: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -161,13 +227,11 @@ export default function App() {
   }, [callTranscript]);
 
   useEffect(() => {
-    // 检查系统主题偏好
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDark(true);
       document.documentElement.classList.add('dark');
     }
     
-    // 检查本地存储的主题设置
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
       setIsDark(true);
@@ -185,6 +249,38 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   };
+
+  useEffect(() => {
+    // 监听语音分析事件
+    const handleSpeechAnalysis = (event: CustomEvent) => {
+      console.log('收到语音分析事件:', event.detail);
+      alert(`收到语音分析结果：\n${JSON.stringify(event.detail, null, 2)}`);
+      setToolResults(prev => ({
+        ...prev,
+        speechAnalysis: event.detail
+      }));
+    };
+
+    // 监听错误纠正事件
+    const handleErrorCorrection = (event: CustomEvent) => {
+      console.log('收到错误纠正事件:', event.detail);
+      alert(`收到错误纠正结果：\n${JSON.stringify(event.detail, null, 2)}`);
+      setToolResults(prev => ({
+        ...prev,
+        corrections: event.detail
+      }));
+    };
+
+    // 添加事件监听器
+    window.addEventListener('speechAnalysisUpdated', handleSpeechAnalysis as EventListener);
+    window.addEventListener('errorCorrectionUpdated', handleErrorCorrection as EventListener);
+
+    // 清理事件监听器
+    return () => {
+      window.removeEventListener('speechAnalysisUpdated', handleSpeechAnalysis as EventListener);
+      window.removeEventListener('errorCorrectionUpdated', handleErrorCorrection as EventListener);
+    };
+  }, []);
 
   return (
     <main className="min-h-screen">
@@ -208,57 +304,53 @@ export default function App() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-6">
-          <div 
+          <ConversationDisplay
             ref={transcriptContainerRef}
-            className="h-[500px] overflow-y-auto space-y-4 mb-4 p-4"
+            transcript={callTranscript}
+            currentText={currentText}
+            toolResults={toolResults}
           >
-            <ConversationDisplay
-              ref={transcriptContainerRef}
-              transcript={callTranscript}
-              currentText={currentText}
-            >
-              {chatHistory.map((chat, index) => (
-                <div 
-                  key={chat.timestamp}
-                  className={`mb-4 transition-opacity duration-200 ${
-                    index === chatHistory.length - 1 
-                      ? 'text-gray-200' 
-                      : 'text-gray-400'
-                  }`}
-                >
-                  <p className="text-sm font-medium">
-                    {chat.role === 'ai' ? 'AI Assistant' : 'You'}
-                  </p>
-                  <p className="mt-1">{chat.message}</p>
-                </div>
-              ))}
-            </ConversationDisplay>
-          </div>
+            {chatHistory.map((chat, index) => (
+              <div 
+                key={chat.timestamp}
+                className={`mb-4 transition-opacity duration-200 ${
+                  index === chatHistory.length - 1 
+                    ? 'text-gray-200' 
+                    : 'text-gray-400'
+                }`}
+              >
+                <p className="text-sm font-medium">
+                  {chat.role === 'ai' ? 'AI Assistant' : 'You'}
+                </p>
+                <p className="mt-1">{chat.message}</p>
+              </div>
+            ))}
+          </ConversationDisplay>
+        </div>
 
-          <div className="flex gap-4 mt-6">
-            <button
-              onClick={handleToggle}
-              disabled={isCallActive}
-              className={`flex-1 h-12 rounded-xl font-medium transition-all
-                ${isCallActive 
-                  ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
-                }`}
-            >
-              Start Conversation
-            </button>
-            <button
-              onClick={stopAudioCall}
-              disabled={!isCallActive}
-              className={`flex-1 h-12 rounded-xl font-medium transition-all
-                ${!isCallActive
-                  ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
-                  : 'bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl'
-                }`}
-            >
-              End Call
-            </button>
-          </div>
+        <div className="flex gap-4 mt-6">
+          <button
+            onClick={handleToggle}
+            disabled={isCallActive}
+            className={`flex-1 h-12 rounded-xl font-medium transition-all
+              ${isCallActive 
+                ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
+              }`}
+          >
+            Start Conversation
+          </button>
+          <button
+            onClick={stopAudioCall}
+            disabled={!isCallActive}
+            className={`flex-1 h-12 rounded-xl font-medium transition-all
+              ${!isCallActive
+                ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
+                : 'bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl'
+              }`}
+          >
+            End Call
+          </button>
         </div>
 
         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl">
@@ -280,10 +372,9 @@ export default function App() {
           </div>
         )}
         
-        <ToolResults 
-          speechAnalysis={toolResults.speechAnalysis}
-          corrections={toolResults.corrections}
-        />
+        <ToolStatusIndicator toolResults={toolResults} />
+        
+        <DebugMessages debugMessages={callDebugMessages} />
       </div>
     </main>
   );
