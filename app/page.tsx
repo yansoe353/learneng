@@ -1,17 +1,8 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { 
-  Role,                              // 用于定义角色（user/assistant）
-  Transcript,                        // 对话记录类型
-  UltravoxSessionStatus,             // 会话状态类型
-  UltravoxExperimentalMessageEvent,    // 调试消息事件类型
-} from 'ultravox-client'; 
-import {  
-  ToolResults,
-  SpeechAnalysisItem,
-  ErrorCorrectionItem 
-} from '@/lib/types';
+import { Role, Transcript, UltravoxSessionStatus, UltravoxExperimentalMessageEvent } from 'ultravox-client'; 
+import { ToolResults, SpeechAnalysisItem, ErrorCorrectionItem } from '@/lib/types';
 import { startCall, endCall } from '@/lib/callFunctions';
 import demoConfig from './demo-config';
 import MicToggleButton from './components/MicToggleButton';
@@ -35,12 +26,12 @@ export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [toolResults, setToolResults] = useState<ToolResults>({});
   const [aiResponse, setAiResponse] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<Array<{
-    role: 'ai' | 'user';
-    message: string;
-    timestamp: number;
-  }>>([]);
+  const [chatHistory, setChatHistory] = useState<Array<{ role: 'ai' | 'user'; message: string; timestamp: number }>>([]);
   const [callDebugMessages, setCallDebugMessages] = useState<UltravoxExperimentalMessageEvent[]>([]);
+
+  // New state for form inputs
+  const [apiKey, setApiKey] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (transcriptContainerRef.current) {
@@ -52,7 +43,7 @@ export default function App() {
   }, [callTranscript]);
 
   const handleStatusChange = useCallback((status: UltravoxSessionStatus | string | undefined) => {
-    if(status) {
+    if (status) {
       setAgentStatus(status);
     } else {
       setAgentStatus('off');
@@ -69,75 +60,8 @@ export default function App() {
     }
   }, []);
 
-  // const handleDebugMessage = useCallback((message: UltravoxExperimentalMessageEvent) => {
-  //   if (message.target && 'registeredTools' in message.target) {
-  //     console.log('Registered Tools:', message.target.registeredTools);
-  //   }
-    
-  //   setCallDebugMessages(prev => [...prev, message]);
-    
-  //   // 处理工具响应
-  //   if (message.message?.type === 'tool_response') {
-  //     const toolResponse = message.message;
-  //     console.log('Tool Response:', toolResponse);
-      
-  //     switch (toolResponse.tool) {
-  //       case 'speechAnalysis':
-  //         const analysisData = toolResponse.response?.analysisData;
-  //         if (analysisData) {
-  //           setToolResults(prev => ({
-  //             ...prev,
-  //             speechAnalysis: Array.isArray(analysisData) ? analysisData : [{
-  //               text: analysisData.text || '',
-  //               score: analysisData.score || 0,
-  //               feedback: analysisData.feedback || '',
-  //               category: analysisData.category
-  //             }]
-  //           }));
-  //         }
-  //         break;
-          
-  //       case 'errorCorrection':
-  //         const correctionData = toolResponse.response?.correctionData;
-  //         if (correctionData) {
-  //           setToolResults(prev => ({
-  //             ...prev,
-  //             corrections: Array.isArray(correctionData) ? correctionData : [{
-  //               text: correctionData.text || '',
-  //               type: correctionData.type || 'grammar',
-  //               correction: correctionData.correction || '',
-  //               explanation: correctionData.explanation
-  //             }]
-  //           }));
-  //         }
-  //         break;
-  //     }
-  //   }
-
-  //   // 处理 LLM 响应
-  //   if (message.message?.type === 'debug' && message.message.message?.startsWith('LLM response:')) {
-  //     const responseText = message.message.message
-  //       .replace('LLM response: ', '')
-  //       .replace(/^"|"$/g, '');
-      
-  //     setCallTranscript(prev => {
-  //       const newTranscript = new Transcript(
-  //         responseText,
-  //         true,
-  //         Role.AGENT,
-  //         Medium.TEXT
-  //       );
-
-  //       if (!prev) return [newTranscript];
-  //       return [...prev, newTranscript];
-  //     });
-  //   }
-  // }, []);
-
   const startAudioCall = async () => {
     try {
-      //console.log('Starting call with tools:', demoConfig.callConfig.selectedTools);
-      
       const callbacks = {
         onStatusChange: handleStatusChange,
         onTranscriptChange: handleTranscriptChange,
@@ -148,22 +72,17 @@ export default function App() {
       handleStatusChange('Call started successfully');
     } catch (error) {
       console.error('Failed to start call:', error);
-      
-      // 添加错误消息处理逻辑
       let userFriendlyMessage = 'An error occurred while starting the call';
-      
+
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
-        
-        if (errorMessage.includes('402') || 
-            errorMessage.includes('subscription') || 
-            errorMessage.includes('set up your subscription')) {
+        if (errorMessage.includes('402') || errorMessage.includes('subscription')) {
           userFriendlyMessage = 'The conversation limit has been reached. Please contact the administrator to continue using.';
         } else if (errorMessage.includes('500')) {
           userFriendlyMessage = 'The server is temporarily unable to respond. Please try again later.';
         }
       }
-      
+
       handleStatusChange(userFriendlyMessage);
     }
   };
@@ -201,34 +120,16 @@ export default function App() {
     };
   }, [isCallActive]);
 
-  useEffect(() => {
-    if (agentStatus) {
-      setDebugMessages(prev => [...prev, `Agent Status: ${agentStatus}`]);
+  const handleApiKeySubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!apiKey) {
+      setFormError("API key is required.");
+      return;
     }
-  }, [agentStatus]);
-
-  useEffect(() => {
-    if (currentText) {
-      setDebugMessages(prev => [...prev, `Message: ${currentText}`]);
-    }
-  }, [currentText]);
-
-  useEffect(() => {
-    console.log('callTranscript changed:', callTranscript);
-  }, [callTranscript]);
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
-    
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
+    // handle API Key submission logic here
+    console.log('API Key submitted:', apiKey);
+    setFormError(null); // Clear any previous error
+  };
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -240,42 +141,6 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   };
-
-  useEffect(() => {
-    // 监听语音分析事件
-    const handleSpeechAnalysis = (event: CustomEvent) => {
-      console.log('收到语音分析事件:', event.detail);
-      //alert(`收到语音分析结果：\n${JSON.stringify(event.detail, null, 2)}`);
-      setToolResults(prev => ({
-        ...prev,
-        speechAnalysis: Array.isArray(event.detail) ? event.detail : [event.detail]
-      }));
-    };
-
-    // 监听错误纠正事件
-    const handleErrorCorrection = (event: CustomEvent) => {
-      console.log('收到错误纠正事件:', event.detail);
-      //alert(`收到错误纠正结果：\n${JSON.stringify(event.detail, null, 2)}`);
-      setToolResults(prev => ({
-        ...prev,
-        corrections: Array.isArray(event.detail) ? event.detail : [event.detail]
-      }));
-    };
-
-    // 添加事件监听器
-    window.addEventListener('speechAnalysisUpdated', handleSpeechAnalysis as EventListener);
-    window.addEventListener('errorCorrectionUpdated', handleErrorCorrection as EventListener);
-
-    // 清理事件监听器
-    return () => {
-      window.removeEventListener('speechAnalysisUpdated', handleSpeechAnalysis as EventListener);
-      window.removeEventListener('errorCorrectionUpdated', handleErrorCorrection as EventListener);
-    };
-  }, []);
-
-  useEffect(() => {
-    console.log('toolResults updated:', toolResults);
-  }, [toolResults]);
 
   return (
     <main className="min-h-screen">
@@ -298,6 +163,24 @@ export default function App() {
           </button>
         </div>
 
+        {/* API Key Form */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-6">
+          <form onSubmit={handleApiKeySubmit} className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Enter Your API Key</h2>
+            <input
+              type="text"
+              className="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-gray-800 dark:text-white"
+              placeholder="API Key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            {formError && <p className="text-red-500 text-sm">{formError}</p>}
+            <button type="submit" className="bg-blue-500 text-white p-2 rounded-lg w-full">
+              Submit API Key
+            </button>
+          </form>
+        </div>
+
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4 mb-6">
           <ConversationDisplay
             ref={transcriptContainerRef}
@@ -306,11 +189,11 @@ export default function App() {
             toolResults={toolResults}
           >
             {chatHistory.map((chat, index) => (
-              <div 
+              <div
                 key={chat.timestamp}
                 className={`mb-4 transition-opacity duration-200 ${
-                  index === chatHistory.length - 1 
-                    ? 'text-gray-200' 
+                  index === chatHistory.length - 1
+                    ? 'text-gray-200'
                     : 'text-gray-400'
                 }`}
               >
@@ -327,47 +210,17 @@ export default function App() {
           <button
             onClick={handleToggle}
             disabled={isCallActive}
-            className={`flex-1 h-12 rounded-xl font-medium transition-all
-              ${isCallActive 
-                ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
-              }`}
+            className="bg-blue-500 text-white p-2 rounded-lg flex-1 transition-all duration-300 hover:bg-blue-400 disabled:opacity-50"
           >
-            Start Conversation
+            {isCallActive ? 'End Call' : 'Start Call'}
           </button>
-          <button
-            onClick={stopAudioCall}
-            disabled={!isCallActive}
-            className={`flex-1 h-12 rounded-xl font-medium transition-all
-              ${!isCallActive
-                ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed'
-                : 'bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl'
-              }`}
-          >
-            End Call
-          </button>
+          <MicToggleButton />
         </div>
 
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl">
-          <div className="flex items-center space-x-2">
-            <SpeakingIndicator agentStatus={agentStatus} />
-            <span className="text-sm text-gray-600 dark:text-gray-300">
-              {agentStatus}
-            </span>
-          </div>
-          {isCallActive && (
-            <CallDuration duration={duration} />
-          )}
-        </div>
-        
-        {aiResponse && (
-          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">AI Assistant</p>
-            <p className="text-gray-800 dark:text-gray-200">{aiResponse}</p>
-          </div>
-        )} 
-        {/* <ToolStatusIndicator toolResults={toolResults} /> */}
-        {/* <DebugMessages debugMessages={callDebugMessages} /> */}
+        <DebugMessages messages={debugMessages} />
+
+        {isCallActive && <CallStatus status={agentStatus} />}
+        {isCallActive && <CallDuration duration={duration} />}
       </div>
     </main>
   );
